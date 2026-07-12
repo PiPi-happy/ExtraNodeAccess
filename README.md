@@ -37,7 +37,7 @@
 
 ## 🚀 快速开始
 
-1. 从 [Releases](https://github.com/PiPi-happy/ExtraNodeAccess/releases/latest) 下载 `extra-node-access.zip`，或 `git clone` 后运行 `./build.sh` 自行打包
+1. `git clone` 本仓库后运行 `./build.sh`，生成 `extra-node-access.zip`
 2. Xboard 后台 → **插件管理** → **上传插件** → 选 zip
 3. 列表点 **安装** → 点 **启用**
 4. 浏览器打开 `https://你的域名/extra-node-access` 开始授权
