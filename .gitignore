@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+__MACOSX/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 构建产物（extra-node-access.zip 由 build.sh 生成；
+# 如不想把 zip 提交进 git、改用 GitHub Release 发布，取消下面这行注释）
+# extra-node-access.zip

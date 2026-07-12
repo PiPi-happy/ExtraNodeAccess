@@ -1,0 +1,25 @@
+{
+    "name": "额外节点授权",
+    "code": "extra_node_access",
+    "type": "feature",
+    "version": "1.0.6",
+    "description": "给单个用户在套餐权限之外，额外授权节点访问权限（支持隐藏节点）。无需为每个定制客户新建专属套餐，常用于 VIP 客户独享节点场景。",
+    "author": "Peter",
+    "require": {
+        "xboard": ">=1.0.0"
+    },
+    "config": {
+        "allow_hidden": {
+            "type": "boolean",
+            "default": true,
+            "label": "允许授权隐藏节点",
+            "description": "是否允许给用户额外授权 show=false（对其他用户隐藏）的节点。开启后可授权任意节点，关闭则仅允许授权已对所在组显示的节点。"
+        },
+        "sync_validity_check": {
+            "type": "boolean",
+            "default": true,
+            "label": "同步侧可用性校验",
+            "description": "节点同步用户列表时，是否对额外授权的用户执行封禁/过期/流量超额校验。建议开启，使其与正常用户保持一致的可用性语义。"
+        }
+    }
+}
