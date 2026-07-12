@@ -37,14 +37,12 @@
 
 ## 🚀 快速开始
 
-1. 下载 [最新版 extra-node-access.zip](./extra-node-access.zip)
+1. 从 [Releases](https://github.com/PiPi-happy/ExtraNodeAccess/releases/latest) 下载 `extra-node-access.zip`，或 `git clone` 后运行 `./build.sh` 自行打包
 2. Xboard 后台 → **插件管理** → **上传插件** → 选 zip
 3. 列表点 **安装** → 点 **启用**
 4. 浏览器打开 `https://你的域名/extra-node-access` 开始授权
 
 > 不需要 SSH、不需要 `composer dump-autoload`。
-
-详见 [PRD.md §6 安装与使用](./PRD.md)。
 
 ## 📖 使用方式（三选一）
 
@@ -101,16 +99,12 @@ php artisan extra-node:revoke 88 12                      # 取消
 - 字段加工照搬 `getAvailableServers`，保证额外节点配置正确
 - 鉴权：网页自动扫描 Local Storage 读 Bearer token
 
-详见 [PRD.md](./PRD.md)。
-
 ## 📁 项目结构
 
 ```
 ExtraNodeAccess/
-├── PRD.md                 # 完整产品需求文档（必读）
 ├── CHANGELOG.md           # 版本变更记录
 ├── build.sh               # 一键打包脚本
-├── extra-node-access.zip  # 当前发布产物
 └── ExtraNodeAccess/       # 插件源码（部署到 Xboard 的 plugins/ 下）
 ```
 

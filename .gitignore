@@ -8,6 +8,5 @@ __MACOSX/
 *.swp
 *.swo
 
-# 构建产物（extra-node-access.zip 由 build.sh 生成；
-# 如不想把 zip 提交进 git、改用 GitHub Release 发布，取消下面这行注释）
-# extra-node-access.zip
+# 构建产物（由 build.sh 生成，通过 GitHub Release 发布，不入库）
+extra-node-access.zip
