@@ -124,4 +124,23 @@ class Plugin extends AbstractPlugin
     {
         self::service()->clearAllCache();
     }
+
+    /**
+     * 定时兜底：每分钟对所有授权节点强制全量同步。
+     *
+     * 节点端用户表偶尔会和面板不同步（节点 WS 抖动、Xboard/插件重装后尤其明显），
+     * 表现为"订阅看得到节点但连不上"。grant 时的即时推送之外再加一层定时补偿，
+     * 让节点端用户表始终保持新鲜，免去手动"删除授权再重新添加"。
+     * notifyFullSync 内部对未连 WS 的节点会自动跳过（如纯中转/落地节点），不会报错。
+     */
+    public function schedule(\Illuminate\Console\Scheduling\Schedule $schedule): void
+    {
+        if (!$this->getConfig('auto_resync', true)) {
+            return;
+        }
+        $schedule->command('extra-node:resync')
+            ->everyMinute()
+            ->withoutOverlapping(5)
+            ->onOneServer();
+    }
 }

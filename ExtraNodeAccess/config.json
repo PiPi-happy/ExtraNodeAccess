@@ -2,7 +2,7 @@
     "name": "额外节点授权",
     "code": "extra_node_access",
     "type": "feature",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "给单个用户在套餐权限之外，额外授权节点访问权限（支持隐藏节点）。无需为每个定制客户新建专属套餐，常用于 VIP 客户独享节点场景。",
     "author": "Peter",
     "require": {
@@ -20,6 +20,12 @@
             "default": true,
             "label": "同步侧可用性校验",
             "description": "节点同步用户列表时，是否对额外授权的用户执行封禁/过期/流量超额校验。建议开启，使其与正常用户保持一致的可用性语义。"
+        },
+        "auto_resync": {
+            "type": "boolean",
+            "default": true,
+            "label": "自动定时同步（兜底）",
+            "description": "每分钟自动对所有授权节点强制刷新一次用户表，避免节点端用户表偶尔不同步导致“看得到节点但连不上”（重装/节点WS抖动后尤其明显）。离线节点会自动跳过。建议开启。"
         }
     }
 }
