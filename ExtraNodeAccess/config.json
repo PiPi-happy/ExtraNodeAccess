@@ -4,7 +4,7 @@
     "type": "feature",
     "version": "1.0.7",
     "description": "给单个用户在套餐权限之外，额外授权节点访问权限（支持隐藏节点）。无需为每个定制客户新建专属套餐，常用于 VIP 客户独享节点场景。",
-    "author": "Peter",
+    "author": "PiPi-happy",
     "require": {
         "xboard": ">=1.0.0"
     },

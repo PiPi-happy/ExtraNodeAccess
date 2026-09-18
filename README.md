@@ -118,7 +118,7 @@ cd ExtraNodeAccess
 
 ## 📝 License
 
-[MIT](./LICENSE) © Peter
+[MIT](./LICENSE) © PiPi-happy
 
 ---
 
