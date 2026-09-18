@@ -21,6 +21,11 @@ Route::group([
     'middleware' => ['admin', 'log'],
 ], function ($router) {
     $router->get('/grants', [ExtraNodeAccessController::class, 'grants']);
+    $router->get('/by-user', [ExtraNodeAccessController::class, 'byUser']);
+    $router->get('/by-server', [ExtraNodeAccessController::class, 'byServer']);
+    $router->get('/users', [ExtraNodeAccessController::class, 'users']);
+    $router->get('/servers', [ExtraNodeAccessController::class, 'servers']);
+    $router->get('/stats', [ExtraNodeAccessController::class, 'stats']);
     $router->post('/grant', [ExtraNodeAccessController::class, 'grant']);
     $router->post('/revoke', [ExtraNodeAccessController::class, 'revoke']);
     $router->get('/options', [ExtraNodeAccessController::class, 'options']);

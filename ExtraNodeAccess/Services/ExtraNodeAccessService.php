@@ -16,7 +16,8 @@ use Plugin\ExtraNodeAccess\Models\ExtraNodeAccess;
  * 职责：
  *  - 查询授权关系（带缓存，避免每次订阅/同步都查 DB）；
  *  - 订阅侧节点字段加工（完全照搬 ServerService::getAvailableServers 的逻辑）；
- *  - grant / revoke 授权管理（含校验与缓存清理）。
+ *  - grant / revoke 授权管理（含校验与缓存清理）；
+ *  - 管理端查询（按用户/按节点聚合、分页搜索、统计）。
  *
  * 两个方向的缓存：
  *  - extra_node:user:{userId}   → 该用户额外授权的 server_id 列表（订阅侧用）
@@ -84,15 +85,23 @@ class ExtraNodeAccessService
         if (!$this->getConfig('allow_hidden', true) && !$server->show) {
             return ['success' => false, 'message' => "节点 [{$server->name}] 为隐藏节点（show=false），当前配置不允许授权隐藏节点"];
         }
-        // 防重复授权
+        // 防重复授权（先查一遍给友好提示；并发下.unique 约束兜底见下方 catch）
         if (ExtraNodeAccess::where('user_id', $userId)->where('server_id', $serverId)->exists()) {
             return ['success' => false, 'message' => "用户 [{$user->email}] 已被授权过节点 [{$server->name}]"];
         }
-        ExtraNodeAccess::create([
-            'user_id' => $userId,
-            'server_id' => $serverId,
-            'remark' => $remark,
-        ]);
+        try {
+            ExtraNodeAccess::create([
+                'user_id' => $userId,
+                'server_id' => $serverId,
+                'remark' => $remark,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 并发双击/重复提交会撞 UNIQUE(user_id, server_id)，转成友好提示而不是 500
+            if ((string) $e->getCode() === '23000' || str_contains($e->getMessage(), 'Duplicate entry')) {
+                return ['success' => false, 'message' => "用户 [{$user->email}] 已被授权过节点 [{$server->name}]"];
+            }
+            throw $e;
+        }
         $this->clearCache($userId, $serverId);
         $this->triggerNodeSync($serverId);
         // group_ids 为空时 getAvailableUsers 直接返回空、不触发同步 Hook，节点端永远收不到该用户
@@ -121,22 +130,22 @@ class ExtraNodeAccessService
     }
 
     /**
-     * 列表查询（联表 user/server，给命令/API/网页展示用）。
+     * 列表查询（联表 user/server，给命令/API 展示用，全量不分页）。
      */
     public function getGrants(?int $userId = null, ?int $serverId = null)
     {
         $query = ExtraNodeAccess::query()
-            ->leftJoin('v2_user', 'v2_extra_node_access.user_id', '=', 'v2_user.id')
-            ->leftJoin('v2_server', 'v2_extra_node_access.server_id', '=', 'v2_server.id')
+            ->leftJoin($this->userTable() . ' as u', 'v2_extra_node_access.user_id', '=', 'u.id')
+            ->leftJoin($this->serverTable() . ' as s', 'v2_extra_node_access.server_id', '=', 's.id')
             ->select(
                 'v2_extra_node_access.id',
                 'v2_extra_node_access.user_id',
                 'v2_extra_node_access.server_id',
                 'v2_extra_node_access.remark',
                 'v2_extra_node_access.created_at',
-                'v2_user.email as user_email',
-                'v2_server.name as server_name',
-                'v2_server.show as server_show'
+                'u.email as user_email',
+                's.name as server_name',
+                's.show as server_show'
             );
         if ($userId) {
             $query->where('v2_extra_node_access.user_id', $userId);
@@ -145,6 +154,172 @@ class ExtraNodeAccessService
             $query->where('v2_extra_node_access.server_id', $serverId);
         }
         return $query->orderBy('v2_extra_node_access.id', 'desc')->get();
+    }
+
+    /**
+     * 平铺分页列表（keyword 匹配用户邮箱/节点名/备注）。
+     * 返回 ['data' => ..., 'total' => int, 'page' => int, 'page_size' => int]。
+     */
+    public function paginateGrants(?string $keyword, int $page = 1, int $pageSize = 20): array
+    {
+        $query = $this->grantsQuery();
+        if ($keyword !== null && $keyword !== '') {
+            $kw = "%{$keyword}%";
+            $query->where(function ($q) use ($kw) {
+                $q->where('u.email', 'like', $kw)
+                    ->orWhere('s.name', 'like', $kw)
+                    ->orWhere('v2_extra_node_access.remark', 'like', $kw);
+            });
+        }
+        $total = (clone $query)->count();
+        $list = $query
+            ->orderBy('v2_extra_node_access.id', 'desc')
+            ->forPage($page, $pageSize)
+            ->get();
+        return ['data' => $list, 'total' => $total, 'page' => $page, 'page_size' => $pageSize];
+    }
+
+    /**
+     * 按用户聚合视角：每个被授权用户一行，带其全部授权节点。
+     * keyword 匹配用户邮箱/备注；返回 ['data' => ..., 'total' => int, 'page' => ..., 'page_size' => ...]。
+     */
+    public function getGrantsByUser(?string $keyword, int $page = 1, int $pageSize = 20): array
+    {
+        $idQuery = ExtraNodeAccess::query()
+            // leftJoin：用户被删除的残留授权也展示（email 为 null 显示"已删除"），便于运营清理
+            ->leftJoin($this->userTable() . ' as u', 'v2_extra_node_access.user_id', '=', 'u.id')
+            ->when($keyword !== null && $keyword !== '', function ($q) use ($keyword) {
+                $kw = "%{$keyword}%";
+                $q->where(function ($q2) use ($kw) {
+                    $q2->where('u.email', 'like', $kw)
+                        ->orWhere('v2_extra_node_access.remark', 'like', $kw);
+                });
+            })
+            ->select('v2_extra_node_access.user_id')
+            ->distinct();
+        $total = (clone $idQuery)->distinct()->count('v2_extra_node_access.user_id');
+        $userIds = (clone $idQuery)
+            ->orderBy('v2_extra_node_access.user_id')
+            ->forPage($page, $pageSize)
+            ->pluck('v2_extra_node_access.user_id');
+        if ($userIds->isEmpty()) {
+            return ['data' => [], 'total' => $total, 'page' => $page, 'page_size' => $pageSize];
+        }
+
+        $emails = User::whereIn('id', $userIds)->pluck('email', 'id');
+        $grants = $this->grantsQuery()
+            ->whereIn('v2_extra_node_access.user_id', $userIds)
+            ->orderBy('v2_extra_node_access.user_id')
+            ->orderBy('v2_extra_node_access.id', 'desc')
+            ->get()
+            ->groupBy('user_id');
+
+        $data = $userIds->map(fn ($uid) => [
+            'user_id' => (int) $uid,
+            'email' => $emails->get($uid),
+            'grant_count' => $grants->has($uid) ? $grants[$uid]->count() : 0,
+            'grants' => $grants->get($uid, collect())->values(),
+        ])->values();
+        return ['data' => $data, 'total' => $total, 'page' => $page, 'page_size' => $pageSize];
+    }
+
+    /**
+     * 按节点聚合视角：全部节点 + 各自的授权用户列表（节点数量级小，不分页）。
+     * $userId 传入时，每个节点附带 authorized 标记（该用户是否已被授权，供节点池勾选置灰）。
+     */
+    public function getServersWithGrants(?int $userId = null): array
+    {
+        $servers = Server::query()
+            ->select('id', 'name', 'show', 'host')
+            ->orderByDesc('id')
+            ->get();
+        $rows = $this->grantsQuery()
+            ->orderBy('v2_extra_node_access.server_id')
+            ->get()
+            ->groupBy('server_id');
+        $mine = $userId
+            ? ExtraNodeAccess::where('user_id', $userId)->pluck('server_id')->flip()
+            : collect();
+        return $servers->map(fn ($s) => [
+            'id' => (int) $s->id,
+            'name' => $s->name,
+            'show' => (bool) $s->show,
+            'host' => $s->host,
+            'grant_count' => $rows->has($s->id) ? $rows[$s->id]->count() : 0,
+            'users' => $rows->get($s->id, collect())->values(),
+            'authorized' => $mine->has($s->id),
+        ])->values()->all();
+    }
+
+    /**
+     * 用户搜索（管理抽屉的远程搜索框用，替代旧版一次只取最新 50 人的下拉）。
+     * $serverId 传入时附带 authorized 标记（该用户对指定节点是否已授权）。
+     */
+    public function searchUsers(?string $keyword, ?int $serverId = null, int $limit = 20): array
+    {
+        $query = User::query()
+            ->select('id', 'email')
+            ->when($keyword !== null && $keyword !== '', fn ($q) => $q->where('email', 'like', "%{$keyword}%"))
+            ->orderByDesc('id')
+            ->limit($limit);
+        $users = $query->get();
+        $authorizedIds = $serverId
+            ? ExtraNodeAccess::where('server_id', $serverId)->pluck('user_id')->flip()
+            : collect();
+        return $users->map(fn ($u) => [
+            'id' => (int) $u->id,
+            'email' => $u->email,
+            'authorized' => $authorizedIds->has($u->id),
+        ])->values()->all();
+    }
+
+    /**
+     * 顶部统计条：总授权数 / 涉及用户数 / 涉及节点数 / 隐藏节点授权数。
+     */
+    public function getStats(): array
+    {
+        return [
+            'total' => ExtraNodeAccess::count(),
+            'user_count' => ExtraNodeAccess::distinct('user_id')->count('user_id'),
+            'server_count' => ExtraNodeAccess::distinct('server_id')->count('server_id'),
+            'hidden_count' => ExtraNodeAccess::query()
+                ->join($this->serverTable() . ' as s', 'v2_extra_node_access.server_id', '=', 's.id')
+                ->where('s.show', 0)
+                ->count(),
+        ];
+    }
+
+    /**
+     * 授权列表基础查询（联表别名 u/s，供 paginateGrants / getGrantsByUser / getServersWithGrants 复用）。
+     */
+    protected function grantsQuery()
+    {
+        return ExtraNodeAccess::query()
+            ->leftJoin($this->userTable() . ' as u', 'v2_extra_node_access.user_id', '=', 'u.id')
+            ->leftJoin($this->serverTable() . ' as s', 'v2_extra_node_access.server_id', '=', 's.id')
+            ->select(
+                'v2_extra_node_access.id',
+                'v2_extra_node_access.user_id',
+                'v2_extra_node_access.server_id',
+                'v2_extra_node_access.remark',
+                'v2_extra_node_access.created_at',
+                'u.email as user_email',
+                's.name as server_name',
+                's.show as server_show'
+            );
+    }
+
+    /**
+     * 表名从核心模型派生，不硬编码 v2_ 前缀（防 Xboard 未来改前缀）。
+     */
+    protected function userTable(): string
+    {
+        return (new User())->getTable();
+    }
+
+    protected function serverTable(): string
+    {
+        return (new Server())->getTable();
     }
 
     /**

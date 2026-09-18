@@ -25,6 +25,8 @@ use Plugin\ExtraNodeAccess\Services\ExtraNodeAccessService;
  */
 class Plugin extends AbstractPlugin
 {
+    // 注意：Octane/WS worker 下本静态实例跨请求复用。ExtraNodeAccessService 必须保持
+    // 无请求态（不缓存 Request/User 等），只做无状态查询与配置读取。
     private static ?ExtraNodeAccessService $service = null;
 
     protected static function service(): ExtraNodeAccessService
@@ -138,8 +140,10 @@ class Plugin extends AbstractPlugin
         if (!$this->getConfig('auto_resync', true)) {
             return;
         }
+        // 间隔可配置（分钟），默认 1 分钟保持与 1.0.7 一致；节点多时可调大（建议 5）。
+        $interval = max(1, (int) $this->getConfig('resync_interval_minutes', 1));
         $schedule->command('extra-node:resync')
-            ->everyMinute()
+            ->cron("*/{$interval} * * * *")
             ->withoutOverlapping(5)
             ->onOneServer();
     }

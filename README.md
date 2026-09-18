@@ -40,7 +40,7 @@
 1. 从 [Releases](https://github.com/PiPi-happy/ExtraNodeAccess/releases/latest) 下载 `extra-node-access.zip`（或 `git clone` 后 `./build.sh` 自行打包）
 2. Xboard 后台 → **插件管理** → **上传插件** → 选 zip
 3. 列表点 **安装** → 点 **启用**
-4. 浏览器打开 `https://你的域名/extra-node-access` 开始授权
+4. 浏览器打开 `https://你的域名/extra-node-access`，首次使用按提示填一次 **Secure Path**（后台保密路径，仅存本机浏览器）即可开始授权
 
 > 不需要 SSH、不需要 `composer dump-autoload`。
 
@@ -48,7 +48,9 @@
 
 ### 🌟 方式一：可视化网页（推荐）
 
-打开 `/extra-node-access`，自动读取后台凭证 → 选用户 + 选节点 + 填备注 → 授权。
+打开 `/extra-node-access`：顶部统计条总览 → **按用户 / 按节点** 双视角浏览授权 → 点「管理」在右侧抽屉里**搜索勾选、批量授权/撤销**。支持分页与关键字搜索，上百定制客户也能轻松管理。
+
+> 安全说明：页面本身是公开静态壳，**不包含后台 secure_path**；管理员首次使用时手动填写一次（存浏览器 Local Storage），token 支持自动扫描后台登录凭证。
 
 ### 方式二：REST API
 
@@ -69,7 +71,7 @@ php artisan extra-node:revoke 88 12                      # 取消
 
 ## 🩺 同步诊断
 
-网页「同步诊断」卡片，输入用户ID + 节点ID，一键输出：
+网页右上角「🩺 同步诊断」按钮（授权列表内每条记录也有快捷诊断入口），输入用户ID + 节点ID，一键输出：
 - 节点 `group_ids` 是否为空（空则同步 Hook 不触发）
 - 节点 WS 是否在线
 - 目标用户是否在节点用户表
@@ -85,6 +87,8 @@ php artisan extra-node:revoke 88 12                      # 取消
 |---|---|---|
 | `allow_hidden` | 开启 | 是否允许授权隐藏节点（`show=false`） |
 | `sync_validity_check` | 开启 | 同步时校验用户未封禁 / 未过期 / 流量未超额 |
+| `auto_resync` | 开启 | 每分钟定时兜底同步，避免节点端用户表不同步导致"看得到连不上" |
+| `resync_interval_minutes` | 1 分钟 | 兜底同步间隔（1/2/5/10 可选），节点多时建议 5 |
 
 ## ⚠️ 已知限制
 
@@ -97,7 +101,7 @@ php artisan extra-node:revoke 88 12                      # 取消
 - 双 Hook：`client.subscribe.servers`（订阅侧）+ `server.users.get`（同步侧），缺一不可
 - Hook 回调用**静态方法**注册，规避 Octane 闭包累积
 - 字段加工照搬 `getAvailableServers`，保证额外节点配置正确
-- 鉴权：网页自动扫描 Local Storage 读 Bearer token
+- 鉴权：token 自动扫描 Local Storage；secure_path 不渲染进公开页面（防泄露后台保密路径）
 
 ## 📁 项目结构
 
