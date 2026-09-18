@@ -9,7 +9,7 @@
       管理员首次使用时在「凭证」弹窗手动填写 secure_path（存本机 Local Storage），token 支持自动扫描。
     -->
     <style>
-        /* 设计语言：Acme 风格指南（UI标准/acme-style-guide.html）——主色 #2563eb，Inter，
+        /* 设计语言：Acme 风格——主色 #2563eb，Inter，
            中性灰阶 slate/gray，浅色卡底 eff6ff/ecfdf5/fefce8，卡片 12px 圆角细边框，微妙对比 */
         :root {
             --bg: #f8fafc;
