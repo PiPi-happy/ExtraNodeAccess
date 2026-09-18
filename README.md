@@ -1,91 +1,61 @@
 # ExtraNodeAccess · Xboard 额外节点授权插件
 
 > 给单个用户在套餐权限之外，**额外授权节点访问**——无需为每个定制客户新建专属套餐。
->
-> Grant any user access to specific nodes beyond their subscription plan — no more creating a dedicated plan for every custom customer.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Xboard-blueviolet)](https://github.com/cedar2025/Xboard)
-[![Version](https://img.shields.io/badge/version-1.0.6-green)](./CHANGELOG.md)
 
----
+## 这是什么
 
-## 🎯 这是什么
+定制客户一多，每人建一个专属套餐会让套餐数和维护成本线性膨胀。本插件直接给指定用户**额外开某几个节点**（含对其他组隐藏的节点），零核心改动，靠 Xboard 两个现成 Hook 叠加一层权限过滤。起源于 [Issue #989](https://github.com/cedar2025/Xboard/issues/989)。
 
-一个 **Xboard**（V2Board 系）插件，解决「个性化定制单人客户越来越多，需要为单个客户单独开放某些节点（尤其是不对其他组显示的隐藏节点）」的需求。
+## 特性
 
-**旧做法的痛**：为每个定制客户新建一个专属套餐 → 把所有节点挂到该套餐 → 套餐数与维护成本随客户数线性膨胀。
-
-**本插件**：直接给指定用户额外开某几个节点，**零核心改动**，靠 Xboard 两个现成 Hook 叠加一层权限过滤。
-
-> 💡 起源于 Xboard Issue #989（Feature Request：给单个用户增加套餐之外的节点使用权）。
-
-## ✨ 特性
-
-- **零核心改动** — 纯插件实现，不碰 Xboard 源码，升级不冲突
-- **支持隐藏节点** — 可授权 `show=false` 的节点，实现 VIP 独享
-- **即时生效** — 授权后自动触发节点用户表同步，无需重启
+- **零核心改动** — 纯插件实现，升级不冲突
+- **支持隐藏节点** — 可授权 `show=false` 的节点，VIP 独享
+- **即时生效** — 授权后自动触发节点同步，另有定时兜底
 - **三种管理入口** — 可视化网页 / REST API / artisan 命令
 - **同步诊断** — 一键排查「授权后连不上」
-- **Octane 兼容** — 长驻进程下 Hook 回调不累积
-- **自动鉴权** — 管理网页自动读取后台凭证，免手动抓 token
-
-## 📸 截图
-
-<!-- 上传后在此放一张管理网页的截图，最直观 -->
-<!-- ![管理界面](docs/screenshot.png) -->
 
 ## 🚀 快速开始
 
-1. 从 [Releases](https://github.com/PiPi-happy/ExtraNodeAccess/releases/latest) 下载 `extra-node-access.zip`（或 `git clone` 后 `./build.sh` 自行打包）
-2. Xboard 后台 → **插件管理** → **上传插件** → 选 zip
-3. 列表点 **安装** → 点 **启用**
-4. 浏览器打开 `https://你的域名/extra-node-access`，首次使用按提示填一次 **Secure Path**（后台保密路径，仅存本机浏览器）即可开始授权
+1. 从 [Releases](https://github.com/PiPi-happy/ExtraNodeAccess/releases/latest) 下载 `extra-node-access.zip`
+2. Xboard 后台 → **插件管理** → 上传 → **安装** → **启用**
+3. 打开 `https://你的域名/extra-node-access`，首次按提示填一次 **Secure Path**（后台保密路径，仅存本机浏览器）即可使用
 
-> 不需要 SSH、不需要 `composer dump-autoload`。
+> 无需 SSH、无需 `composer dump-autoload`。
 >
-> ⚠️ **升级插件后必须重载 Octane**：Xboard 生产跑 Octane 常驻进程，覆盖上传后内存中仍是旧类定义，新增的端点/方法会 500（路由已更新但类还是旧的）。上传新版后执行：
+> ⚠️ **升级后必须重载 Octane**（常驻进程不热更新已加载的类，否则新增端点会 500）：
+>
 > ```bash
 > docker exec -w /www xboard-xboard-1 php artisan octane:reload
-> docker exec xboard-xboard-1 supervisorctl restart all   # 或直接重启容器
+> docker exec xboard-xboard-1 supervisorctl restart all
+> # 或直接: docker restart xboard-xboard-1
 > ```
 
-## 📖 使用方式（三选一）
+## 使用方式
 
-### 🌟 方式一：可视化网页（推荐）
+**网页（推荐）** — 顶部统计总览 → 按用户 / 按节点双视角 → 「+ 新增授权」或行内「管理」进入抽屉：搜索勾选、批量授权/撤销，支持分页与关键字搜索，上百定制客户也能轻松管理。页面为公开静态壳、不含 secure_path；admin token 自动扫描后台登录凭证。
 
-打开 `/extra-node-access`：顶部统计条总览 → **按用户 / 按节点** 双视角浏览授权 → 点「管理」在右侧抽屉里**搜索勾选、批量授权/撤销**。支持分页与关键字搜索，上百定制客户也能轻松管理。
-
-> 安全说明：页面本身是公开静态壳，**不包含后台 secure_path**；管理员首次使用时手动填写一次（存浏览器 Local Storage），token 支持自动扫描后台登录凭证。
-
-### 方式二：REST API
+**API** — `user_id` / `server_id` 均支持单个值或数组批量：
 
 ```bash
 curl -X POST https://你的域名/api/v2/{secure_path}/extra-node/grant \
-  -H "Authorization: Bearer {admin_token}" \
-  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {admin_token}" -H "Content-Type: application/json" \
   -d '{"user_id":88,"server_id":12,"remark":"VIP独享"}'
 ```
 
-### 方式三：命令行
+**命令行** —
 
 ```bash
-php artisan extra-node:grant 88 12 --remark="VIP独享"   # 授权
-php artisan extra-node:list                              # 查询
-php artisan extra-node:revoke 88 12                      # 取消
+php artisan extra-node:grant 88 12 --remark="VIP独享"
+php artisan extra-node:list                # --user= / --server= 筛选
+php artisan extra-node:revoke 88 12
 ```
 
-## 🩺 同步诊断
+**同步诊断** — 网页右上角「同步诊断」，输入用户ID + 节点ID，一键输出节点 `group_ids`、WS 在线状态、用户是否已注入节点用户表、封禁/过期/流量状态，排查「订阅看得到但连不上」。
 
-网页右上角「🩺 同步诊断」按钮（授权列表内每条记录也有快捷诊断入口），输入用户ID + 节点ID，一键输出：
-- 节点 `group_ids` 是否为空（空则同步 Hook 不触发）
-- 节点 WS 是否在线
-- 目标用户是否在节点用户表
-- 用户封禁 / 过期 / 流量超额状态
-
-排查「订阅看得到但连不上」的神器。
-
-## 🔧 配置项
+## 配置项
 
 后台 → 插件管理 → 额外节点授权 → 配置
 
@@ -93,43 +63,27 @@ php artisan extra-node:revoke 88 12                      # 取消
 |---|---|---|
 | `allow_hidden` | 开启 | 是否允许授权隐藏节点（`show=false`） |
 | `sync_validity_check` | 开启 | 同步时校验用户未封禁 / 未过期 / 流量未超额 |
-| `auto_resync` | 开启 | 每分钟定时兜底同步，避免节点端用户表不同步导致"看得到连不上" |
-| `resync_interval_minutes` | 1 分钟 | 兜底同步间隔（1/2/5/10 可选），节点多时建议 5 |
+| `auto_resync` | 开启 | 定时兜底同步，避免节点端用户表不同步导致「看得到连不上」 |
+| `resync_interval_minutes` | 1 | 兜底同步间隔（分钟），节点多时建议 5 |
 
-## ⚠️ 已知限制
+## 已知限制
 
-- **节点必须至少属于一个权限组**：`group_ids` 为空的节点，Xboard 的 `getAvailableUsers` 不触发同步 Hook。建议给独享节点设一个**不含任何用户的空组**。
-- **中转节点**（`parent_id`）：走中转需「入口节点 + 落地节点」都授权。
-- **后台前端无法注入菜单**：admin 是独立 SPA，管理走独立网页 + API。
+- **节点必须至少属于一个权限组**：`group_ids` 为空的节点不触发同步 Hook，独享节点建议挂一个**不含任何用户的空组**
+- **中转节点**（`parent_id`≠0）不连面板 WS：需「入口 + 落地」都授权，且授权靠节点定时拉取生效
+- admin 后台是独立 SPA，无法注入菜单，管理走独立网页 + API
 
-## 🛠️ 技术要点
+## 面向开发者
 
 - 双 Hook：`client.subscribe.servers`（订阅侧）+ `server.users.get`（同步侧），缺一不可
-- Hook 回调用**静态方法**注册，规避 Octane 闭包累积
-- 字段加工照搬 `getAvailableServers`，保证额外节点配置正确
-- 鉴权：token 自动扫描 Local Storage；secure_path 不渲染进公开页面（防泄露后台保密路径）
-
-## 📁 项目结构
-
-```
-ExtraNodeAccess/
-├── CHANGELOG.md           # 版本变更记录
-├── build.sh               # 一键打包脚本
-└── ExtraNodeAccess/       # 插件源码（部署到 Xboard 的 plugins/ 下）
-```
-
-## 🔨 自行构建
+- Hook 回调用静态方法注册，规避 Octane 闭包累积；额外节点的字段加工照搬 `getAvailableServers`，保证能连上
 
 ```bash
 git clone https://github.com/PiPi-happy/ExtraNodeAccess.git
-cd ExtraNodeAccess
-./build.sh    # 生成 extra-node-access.zip
+cd ExtraNodeAccess && ./build.sh   # 生成 extra-node-access.zip
 ```
 
-## 📝 License
+## License
 
 [MIT](./LICENSE) © PiPi-happy
 
----
-
-如果这个插件帮到了你，欢迎 ⭐ Star 让更多人看到。
+如果帮到了你，欢迎 ⭐ Star。
