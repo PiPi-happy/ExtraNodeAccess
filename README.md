@@ -43,6 +43,12 @@
 4. 浏览器打开 `https://你的域名/extra-node-access`，首次使用按提示填一次 **Secure Path**（后台保密路径，仅存本机浏览器）即可开始授权
 
 > 不需要 SSH、不需要 `composer dump-autoload`。
+>
+> ⚠️ **升级插件后必须重载 Octane**：Xboard 生产跑 Octane 常驻进程，覆盖上传后内存中仍是旧类定义，新增的端点/方法会 500（路由已更新但类还是旧的）。上传新版后执行：
+> ```bash
+> docker exec -w /www xboard-xboard-1 php artisan octane:reload
+> docker exec xboard-xboard-1 supervisorctl restart all   # 或直接重启容器
+> ```
 
 ## 📖 使用方式（三选一）
 
