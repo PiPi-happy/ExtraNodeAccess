@@ -264,6 +264,10 @@
             <button class="tab active" id="tabUser" onclick="switchTab('user')">按用户</button>
             <button class="tab" id="tabServer" onclick="switchTab('server')">按节点</button>
         </div>
+        <button class="btn sm" onclick="openNewGrant()">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            新增授权
+        </button>
         <div class="search">
             <span class="icon"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
             <input id="searchInput" placeholder="搜索邮箱 / 节点名 / 备注…" oninput="onSearchInput()">
@@ -590,6 +594,64 @@
         document.getElementById('pgInfo').textContent = `第 ${d.page} / ${maxPage} 页 · 共 ${d.total} 条`;
         document.getElementById('pgPrev').disabled = d.page <= 1;
         document.getElementById('pgNext').disabled = d.page >= maxPage;
+    }
+
+    // ================= 新增授权（选择用户 → 进入授权抽屉） =================
+    function openNewGrant() {
+        drawerCtx = { type: 'new' };
+        drawerSelected = new Set();
+        drawerPoolKeyword = '';
+        document.getElementById('drawerTitle').textContent = '新增授权 · 选择用户';
+        openDrawer();
+        renderNewUserPick();
+    }
+
+    function renderNewUserPick() {
+        const body = document.getElementById('drawerBody');
+        body.innerHTML = `
+            <div class="drawer-sec">
+                <h3>第一步 · 选择用户（选中后进入授权面板）</h3>
+                <div class="pool-toolbar">
+                    <input id="newUserSearch" placeholder="输入邮箱关键词搜索（回车或点搜索）">
+                    <button class="btn ghost sm" onclick="searchNewUsers()">搜索</button>
+                </div>
+                <div class="pool-list" id="newUserList"><div class="empty" style="padding:20px 0">加载中…</div></div>
+                <div class="hint" style="margin-top:8px;">列表默认显示最新注册的 20 个用户；新客户尚无授权记录时不会出现在左侧列表中，从这里进入即可给他首次授权。</div>
+            </div>`;
+        document.getElementById('newUserSearch').addEventListener('keydown', e => {
+            if (e.key === 'Enter') searchNewUsers();
+        });
+        loadNewUsers('');
+    }
+
+    function searchNewUsers() {
+        loadNewUsers(document.getElementById('newUserSearch').value.trim());
+    }
+
+    async function loadNewUsers(kw) {
+        const el = document.getElementById('newUserList');
+        if (!el) return;
+        el.innerHTML = '<div class="empty" style="padding:20px 0">加载中…</div>';
+        try {
+            const kwParam = kw ? '?keyword=' + encodeURIComponent(kw) : '';
+            const users = await api('/users' + kwParam);
+            if (!users.length) {
+                el.innerHTML = '<div class="empty" style="padding:20px 0">' + (kw ? '没有匹配的用户' : '暂无用户') + '</div>';
+                return;
+            }
+            // email 走 dataset（解码后为纯文本），不进内联 JS 字符串，避免转义/注入问题
+            el.innerHTML = users.map(u => `
+                <div class="pool-item" data-uid="${u.id}" data-email="${esc(u.email)}" onclick="pickUserEl(this)">
+                    <span class="grow">${esc(u.email) || '<span class="meta">（无邮箱）</span>'}</span>
+                    <span class="meta">#${u.id}</span>
+                </div>`).join('');
+        } catch (e) {
+            el.innerHTML = '<div class="empty" style="padding:20px 0">加载失败</div>';
+        }
+    }
+
+    function pickUserEl(el) {
+        openUserDrawer(+el.dataset.uid, (el.dataset.email || '').trim());
     }
 
     // ================= 抽屉 =================
