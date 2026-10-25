@@ -1,37 +1,73 @@
 {
-    "name": "额外节点授权",
-    "code": "extra_node_access",
-    "type": "feature",
-    "version": "1.1.1",
-    "description": "给单个用户在套餐权限之外，额外授权节点访问权限（支持隐藏节点）。无需为每个定制客户新建专属套餐，常用于 VIP 客户独享节点场景。",
-    "author": "PiPi-happy",
-    "require": {
-        "xboard": ">=1.0.0"
-    },
-    "config": {
-        "allow_hidden": {
-            "type": "boolean",
-            "default": true,
-            "label": "允许授权隐藏节点",
-            "description": "是否允许给用户额外授权 show=false（对其他用户隐藏）的节点。开启后可授权任意节点，关闭则仅允许授权已对所在组显示的节点。"
-        },
-        "sync_validity_check": {
-            "type": "boolean",
-            "default": true,
-            "label": "同步侧可用性校验",
-            "description": "节点同步用户列表时，是否对额外授权的用户执行封禁/过期/流量超额校验。建议开启，使其与正常用户保持一致的可用性语义。"
-        },
-        "auto_resync": {
-            "type": "boolean",
-            "default": true,
-            "label": "自动定时同步（兜底）",
-            "description": "每分钟自动对所有授权节点强制刷新一次用户表，避免节点端用户表偶尔不同步导致“看得到节点但连不上”（重装/节点WS抖动后尤其明显）。离线节点会自动跳过。建议开启。"
-        },
-        "resync_interval_minutes": {
-            "type": "number",
-            "default": 1,
-            "label": "定时同步间隔（分钟）",
-            "description": "自动兜底同步的执行间隔，填正整数（常用 1 / 2 / 5 / 10）。节点数量多时可调大（建议 5），降低推送频率；默认 1 分钟与 1.0.7 行为一致。"
-        }
-    }
+ "name": "额外节点授权",
+ "code": "extra_node_access",
+ "type": "feature",
+ "version": "1.4.0",
+ "description": "给单个用户在套餐权限之外，额外授权节点访问权限（支持隐藏节点）。v1.4：移除 Mieru 中转管理（遗留需求，方案不可行已废弃）；保留加速订阅端点（OpenClash 等客户端自动融合 mieru 链式加速）。",
+ "author": "PiPi-happy",
+ "require": {
+  "xboard": ">=1.0.0"
+ },
+ "config": {
+  "allow_hidden": {
+   "type": "boolean",
+   "default": true,
+   "label": "允许授权隐藏节点",
+   "description": "是否允许给用户额外授权 show=false（对其他用户隐藏）的节点。开启后可授权任意节点，关闭则仅允许授权已对所在组显示的节点。"
+  },
+  "sync_validity_check": {
+   "type": "boolean",
+   "default": true,
+   "label": "同步侧可用性校验",
+   "description": "节点同步用户列表时，是否对额外授权的用户执行封禁/过期/流量超额校验。建议开启，使其与正常用户保持一致的可用性语义。"
+  },
+  "auto_resync": {
+   "type": "boolean",
+   "default": true,
+   "label": "自动定时同步（兜底）",
+   "description": "每分钟自动对所有授权节点强制刷新一次用户表，避免节点端用户表偶尔不同步导致“看得到节点但连不上”（重装/节点WS抖动后尤其明显）。离线节点会自动跳过。建议开启。"
+  },
+  "resync_interval_minutes": {
+   "type": "number",
+   "default": 1,
+   "label": "定时同步间隔（分钟）",
+   "description": "自动兜底同步的执行间隔，填正整数（常用 1 / 2 / 5 / 10）。节点数量多时可调大（建议 5），降低推送频率；默认 1 分钟与 1.0.7 行为一致。"
+  },
+  "clash_sub_enabled": {
+   "type": "boolean",
+   "default": true,
+   "label": "加速订阅端点",
+   "description": "启用 /api/v2/ena-sub/v1/clash 加速订阅端点。OpenClash 等无扩展脚本能力的客户端把订阅地址指向该端点（带 ?token=订阅token），服务端自动注入 mieru 链式加速结构，订阅照常自动更新。"
+  },
+  "clash_sub_subconverter": {
+   "type": "string",
+   "default": "",
+   "label": "加速订阅 · subconverter 地址",
+   "description": "【必填】拉取用户 Clash 订阅转换结果的地址模板（需含 target=clash&url=）。端点会在其后拼接用户订阅链接的 urlencode。填自己的 subconverter 部署地址，不填则端点透传原订阅（无加速）。"
+  },
+  "clash_sub_landing_keywords": {
+   "type": "string",
+   "default": "香港BA,ICX,日本GR,日本OR",
+   "label": "加速订阅 · 落地节点关键字",
+   "description": "名称含任一关键字的落地节点会被注入加速（生成 [前缀]原名 的加速版，与直连版并存）。逗号分隔，可随时增删。"
+  },
+  "clash_sub_relay_keywords": {
+   "type": "string",
+   "default": "京渝桂粤加速",
+   "label": "加速订阅 · 中转节点关键字",
+   "description": "名称含任一关键字的 mieru 中转节点会被选入「前置代理组」。逗号分隔。"
+  },
+  "clash_sub_group_name": {
+   "type": "string",
+   "default": "加速组",
+   "label": "加速订阅 · 前置组名",
+   "description": "自动创建的前置代理组名（面板中可切换用哪个中转节点）。组名变更后客户端需在新组重新选择节点。"
+  },
+  "clash_sub_prefix": {
+   "type": "string",
+   "default": "[加速版]",
+   "label": "加速订阅 · 加速版前缀",
+   "description": "加速版节点名前缀，与直连版并存互不影响。"
+  }
+ }
 }

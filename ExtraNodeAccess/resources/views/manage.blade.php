@@ -228,9 +228,36 @@
             .stats { grid-template-columns: repeat(2, 1fr); }
             .search { max-width: none; width: 100%; margin-left: 0; }
         }
+        /* ===== v2.0 左侧导航 ===== */
+        body { padding-left: 208px; }
+        .side {
+            position: fixed; left: 0; top: 0; bottom: 0; width: 200px;
+            background: #ffffff; border-right: 1px solid var(--border);
+            padding: 16px 10px; overflow-y: auto; z-index: 40;
+        }
+        .side-group { font-size: 11px; color: var(--text-3); font-weight: 700; letter-spacing: .08em; padding: 14px 10px 6px; }
+        .nav-item {
+            padding: 9px 12px; border-radius: 8px; font-size: 13.5px; color: var(--text-2);
+            cursor: pointer; transition: all .15s; margin-bottom: 2px;
+        }
+        .nav-item:hover { background: var(--primary-soft); color: var(--primary); }
+        .nav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+        @media (max-width: 900px) {
+            body { padding-left: 0; padding-bottom: 54px; }
+            .side { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: auto;
+                    display: flex; gap: 6px; border-right: none; border-top: 1px solid var(--border); padding: 8px; }
+            .side-group { display: none; }
+            .nav-item { flex: 1; text-align: center; margin: 0; padding: 8px 4px; }
+        }
     </style>
 </head>
 <body>
+
+<aside class="side">
+    <div style="padding:4px 10px 12px;font-weight:800;color:var(--text-strong)">ExtraNodeAccess</div>
+    <div class="side-group">节点授权</div>
+    <div class="nav-item active" data-view="grants" onclick="navTo('grants')">授权总览</div>
+</aside>
 
 <header class="topbar">
     <div class="topbar-inner">
@@ -259,7 +286,7 @@
     </section>
 
     <!-- Tab + 搜索 -->
-    <div class="list-head">
+    <div class="list-head" id="listHead">
         <div class="tabs">
             <button class="tab active" id="tabUser" onclick="switchTab('user')">按用户</button>
             <button class="tab" id="tabServer" onclick="switchTab('server')">按节点</button>
@@ -281,6 +308,7 @@
         <span class="info" id="pgInfo"></span>
         <button class="btn ghost sm" id="pgNext" onclick="goPage(1)">下一页 ›</button>
     </div>
+
 </main>
 
 <!-- 抽屉 -->
@@ -470,6 +498,14 @@
     let drawerPool = [];           // 节点池 / 用户池
     let drawerSelected = new Set();
     let drawerPoolKeyword = '';
+
+        let currentView = 'grants';
+        function setView(view) {
+            currentView = view;
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === view));
+            if (view === 'grants') loadList();
+        }
+        function navTo(v) { setView(v); }
 
     function switchTab(tab) {
         state.tab = tab; state.page = 1;

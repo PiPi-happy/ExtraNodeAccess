@@ -31,3 +31,16 @@ Route::group([
     $router->get('/options', [ExtraNodeAccessController::class, 'options']);
     $router->get('/diagnose', [ExtraNodeAccessController::class, 'diagnose']);
 });
+
+// ==================== v2.5 加速订阅端点（OpenClash 等无扩展脚本的客户端） ====================
+// 独立前缀，不走 secure_path：面板用户用「订阅 token」鉴权（与 /s/{token} 同源凭据）。
+// 客户端把订阅地址指向本端点，服务端注入 mieru 链式加速结构后返回完整 Clash 配置。
+
+use Plugin\ExtraNodeAccess\Http\Controllers\MieruSubscribeController;
+
+Route::group([
+    'prefix' => '/api/v2/ena-sub/v1',
+    'middleware' => [],
+], function ($router) {
+    $router->get('/clash', [MieruSubscribeController::class, 'clash']);
+});

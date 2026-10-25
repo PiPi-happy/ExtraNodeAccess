@@ -1,5 +1,35 @@
 # 变更记录
 
+## 1.4.0 (2026-10-25) · 移除中转管理，聚焦节点授权 + 加速订阅
+- **移除 Mieru 中转管理全部功能**（v2.0/v2.5 遗留需求，迭代确认方案无法达成目标，正式废弃）：
+  - 删除「中转节点 / 开通记录」管理页视图、`/mieru/*` 管理端点、`/api/v2/ena-agent/v1/*` Agent 端点
+  - 删除 `ena-mieru:reconcile` 命令与定时调度、ena-agent 交付物、3 张 mieru 相关 migration
+  - 删除配置项：`mieru_sync_interval_minutes`、`mieru_default_speed_mbps`、`mieru_portal_slug`
+  - 数据库已建的 `v2_ena_relay_nodes` / `v2_ena_mieru_provisions` 表不影响运行，如需清理可手动 DROP
+- **保留加速订阅端点**（`GET /api/v2/ena-sub/v1/clash?token=`）：OpenClash 等客户端订阅该端点即自动融合 mieru 链式加速，参数 `clash_sub_*` 后台可调——该能力不依赖被移除的中转管理体系
+- **节点授权（v1）功能不变**：双 Hook 追加、管理页、定时兜底同步原样保留
+
+## 1.3.0 (2026-10-21) · v2.0 迭代：中转管理全面升级
+- **管理页左侧导航栏**：功能拆分为「节点授权 / 中转管理」两版块（中转管理含「中转节点」「开通记录」两个子视图）
+- **Mieru 开通配置迁移到中转节点维度**：每个中转节点独立配置「Mieru 自动开通开关 + 绑定套餐 ID（CSV）+ 端口池 + 保留端口」，管理页节点卡片直接编辑保存（不再藏在插件全局配置）；支持添加任意多个中转节点
+- **开通记录支持「移除」**：吊销后 Agent 自动在中转 VPS 执行 `nobrand --user-del` 删除用户并释放端口（此前仅停用）
+- **新增 `/nodes/update` 端点**：节点卡片保存（名称/播报地址/端口/传输/端口池/保留端口/自动开通开关/套餐绑定/启停）
+- **开通记录列升级**：显示中转节点名、用户专属端口；手动开通支持选择目标节点与「越过资格」
+- **ena-agent 状态持久化**：每用户变更指纹缓存（/var/lib/ena-agent/state.tsv），无变化跳过 nobrand 调用；被中断可断点续传
+- **修复**：Agent systemd `TimeoutStartSec=300` 小于首轮全量收敛耗时，导致被反复杀死、永远无法回报（改 `infinity`）
+- **收编 NoBrand-OneClick**：fork 至 [PiPi-happy/NoBrand-OneClick](https://github.com/PiPi-happy/NoBrand-OneClick)（GPL-3.0），本插件 Agent 依赖该仓库 ≥3.2.6，不再跟随原作者更新
+- 实测：沪港 IPLC 22 用户全量自动开户收敛成功（端口/到期/限速精确映射）
+
+## 1.2.0 (2026-10-21) · v2.0 规划 M1「Mieru 中转自动开通」面板骨架
+- **新增 Mieru 中转自动开通模块（PRD §13 / M1）**：用户当前有效套餐命中「指定套餐」（`mieru_enabled_plan_ids`，多选任一）即自动生成 Mieru 开通记录（期望状态），配额=套餐月流量、限速=套餐带宽（Mbps）、到期=套餐 expired_at
+- **新增 Agent API**（`/api/v2/ena-agent/v1/desired|report`，独立前缀 + 节点级 Bearer token 鉴权，不走 admin secure_path）：中转 VPS 上的 `ena-agent`（M2 交付）按节奏拉取期望状态并调用 `nobrand mieru` 幂等收敛本机用户
+- **新增两张表**：`v2_ena_relay_nodes`（中转节点注册，token 仅存 sha256）、`v2_ena_mieru_provisions`（开通记录与状态机：pending/active/suspended/expired/revoked/error）
+- **管理页新增「中转开通」页签**：总览（开关/套餐映射/节点在线/统计）、中转节点管理（新建一次性展示 Token、轮换、启停）、开通记录（筛选/手动开通/启停/重置密码/查看凭据）、立即对账
+- **新增配置项**：`mieru_enabled`、`mieru_enabled_plan_ids`、`mieru_sync_interval_minutes`（默认 5）、`mieru_default_speed_mbps`、`mieru_portal_slug`（M3 门户使用）
+- **新增 artisan 命令** `ena-mieru:reconcile` + 定时调度（Octane 兼容，与 v1 调度并存）
+- Mieru 密码 `Crypt` 加密存库；对账对 revoked 终态不自动拉起
+- ⚠️ **升级注意**：上传新版 zip 后必须 `php artisan octane:reload` + `supervisorctl restart all`（或重启容器），否则新增端点会 500（同 1.1.0 根因）
+
 ## 1.1.1 (2026-09-18)
 - **新增「+ 新增授权」按钮**：修复新客户（尚无任何授权记录、不出现在列表中）无法进入首次授权流程的入口缺失——从邮箱搜索选择用户后直接进入其授权面板
 - **修复「定时同步间隔」配置项在 Xboard 后台渲染为空白**：Xboard 插件配置渲染仅支持 string / number / boolean，不支持 select，改为 number 类型（填正整数，常用 1/2/5/10）
